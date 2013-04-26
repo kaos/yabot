@@ -95,7 +95,11 @@ leave_channel(Ref, Channel) ->
 init(Options) ->
     application:start(eircc),
     {ok, Irc} = eircc_sup:start_client(Options),
-    {ok, #state{ irc=Irc }}.
+    {ok, #state{ 
+            irc=Irc,
+            bridge=proplists:get_value(bridge, Options, [])
+           }
+    }.
 
 
 %%--------------------------------------------------------------------
@@ -153,8 +157,8 @@ handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, State) ->
     io:format("~p got private message from ~p: ~p~n", [?MODULE, Sender, Message]),
     {noreply, State};
 handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridge=Bridge }=State) ->
-    io:format("~p got message from ~p/~p: ~p~n", [?MODULE, Channel, Sender, Message]),
-    Msg = io:format("[~p] ~p", [Sender, Message]),
+    io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, Message]),
+    Msg = io_lib:format("[~s] ~s", [Sender, Message]),
     [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge],
     {noreply, State};
 handle_info(_Info, State) ->

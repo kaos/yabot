@@ -114,7 +114,8 @@ init(Options) ->
             server=Server, 
             port=proplists:get_value(port, Options, default),
             room=proplists:get_value(room, Options),
-            nick=proplists:get_value(nick, Options, "yabot")
+            nick=exmpp_utils:any_to_binary(proplists:get_value(nick, Options, "yabot")),
+            bridge=proplists:get_value(bridge, Options, [])
            },
      0
     }.
@@ -150,7 +151,7 @@ handle_call({join_room, Room, Nick}, _From, #state{ room=Room }=State) ->
       send(
         exmpp_presence:presence(available, "Ready"), 
         muc_room(Room, Nick), 
-        State)
+        State#state{ nick=exmpp_utils:any_to_binary(Nick)})
     };
 handle_call({join_room, Room, Nick}, _From, #state{ room=OldRoom }=State) ->
     {reply, ok, join(Room, Nick, "Ready", leave(OldRoom, State))};
@@ -214,17 +215,27 @@ handle_info(#received_packet{
                from=From,
                raw_packet=Packet }, 
             #state{ bridge=Bridge }=State) ->
+    Jid = exmpp_jid:make(From),
     io:format("~p received ~p ~s from ~s~n", 
               [?MODULE, Type, Attr, 
-               exmpp_jid:to_list(
-                 exmpp_jid:make(From))]),
+               exmpp_jid:to_list(Jid)]),
     case Type of
         message ->
             Message=exmpp_message:get_body(Packet),
             io:format("~s~n", [Message]),
-            {_, _, Sender}=From,
-            Msg = io:format("[~s] ~s", [Sender, Message]),
-            [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge];
+            case Message of
+                undefined ->
+                    io:format("~s~n", [exmpp_xml:document_to_list(Packet)]);
+                _ ->
+                    Sender = exmpp_jid:resource(Jid),
+                    case State#state.nick of
+                        Sender -> nop;
+                        _ ->
+                            Msg = io_lib:format("[~s] ~s", [Sender, Message]),
+                            %%io:format("~p bridge message to ~p: ~p~n", [?MODULE, Bridge, Msg]),
+                            [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge]
+                    end
+            end;
         iq ->
             io:format("~s~n", [exmpp_xml:document_to_list(Packet)]);
         _ ->
@@ -295,7 +306,7 @@ join(Room, Nick, Status, State) ->
       muc_room(Room, Nick),
       State
      ),
-    State#state{ room=Room, nick=Nick }.
+    State#state{ room=Room, nick=exmpp_utils:any_to_binary(Nick) }.
 
 leave(undefined, State) -> State;
 leave(Room, State) ->
