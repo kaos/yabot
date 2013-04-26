@@ -20,14 +20,14 @@
 %% API
 -export([
          start_link/0,
-         start_client/2
+         start_client/2,
+         start_client/3,
+         send_message/2,
+         client_req/3
         ]).
 
 %% Supervisor callbacks
 -export([init/1]).
-
-%% Helper macro for declaring children of supervisor
--define(PROT_SPEC(I, Args), {I, {I, start_link, Args}, transient, 5000, worker, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -36,13 +36,37 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start_client(Protocol, Options) ->
-    supervisor:start_child(?MODULE, ?PROT_SPEC(Protocol, [Options])).
+start_client(Mod, Options) ->
+    start_client(Mod, Mod, Options).
+
+start_client(Id, Mod, Options) ->
+    supervisor:start_child(
+      ?MODULE,
+      {Id, {Mod, start_link, [Options]}, transient, 5000, worker, [Mod]}
+     ).
+
+send_message(Id, Message) ->
+    client_req(Id, send_message, [Message]).
+
+client_req(Id, Fun, Args) ->
+    case client(Id) of
+        {Id, Pid, _, [Mod|_]} ->
+            erlang:apply(Mod, Fun, [Pid|Args])
+    end.
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    {ok, { {one_for_one, 1, 10}, []} }.
 
+client(Id) ->
+    case lists:keyfind(
+           Id, 1, 
+           supervisor:which_children(?MODULE)) of
+        false ->
+            {client_not_found, Id};
+        Client ->
+            Client
+    end.
