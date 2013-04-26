@@ -26,7 +26,7 @@
          terminate/2, code_change/3]).
 
 %% yabot_transport callbacks
--export([send_message/2]).
+-export([send_message/2, add_bridge/2]).
 
 %% irc specific api
 -export([join_channel/2, leave_channel/2]).
@@ -36,7 +36,8 @@
 -define(SERVER, ?MODULE). 
 
 -record(state, {
-          irc
+          irc,
+          bridge=[]
          }).
 
 %%%===================================================================
@@ -53,12 +54,17 @@
 start_link(Options) ->
     gen_server:start_link(?MODULE, Options, []).
 
+
 %%%===================================================================
 %%% yabot_transport callbacks
 %%%===================================================================
 
 send_message(Ref, Message) ->
     gen_server:call(Ref, {send_message, Message}).
+
+add_bridge(Ref, Peer) ->
+    gen_server:call(Ref, {add_bridge, Peer}).
+
 
 %%%===================================================================
 %%% irc api
@@ -69,6 +75,7 @@ join_channel(Ref, Channel) ->
 
 leave_channel(Ref, Channel) ->
     gen_server:call(Ref, {leave_channel, Channel}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -113,6 +120,8 @@ handle_call({join_channel, _Channel}, _From, State) ->
     {reply, ok, State};
 handle_call({leave_channel, _Channel}, _From, State) ->
     {reply, ok, State};
+handle_call({add_bridge, Peer}, _From, #state{ bridge=Peers }=State) ->
+    {reply, ok, State#state{ bridge=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -140,6 +149,14 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, State) ->
+    io:format("~p got private message from ~p: ~p~n", [?MODULE, Sender, Message]),
+    {noreply, State};
+handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridge=Bridge }=State) ->
+    io:format("~p got message from ~p/~p: ~p~n", [?MODULE, Channel, Sender, Message]),
+    Msg = io:format("[~p] ~p", [Sender, Message]),
+    [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge],
+    {noreply, State};
 handle_info(_Info, State) ->
     io:format("~p got: ~p~n", [?MODULE, _Info]),
     {noreply, State}.

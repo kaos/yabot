@@ -26,7 +26,7 @@
          terminate/2, code_change/3]).
 
 %% yabot_transport callbacks
--export([send_message/2]).
+-export([send_message/2, add_bridge/2]).
 
 %% xmpp specific api
 -export([join_room/3, leave_room/2]).
@@ -41,7 +41,8 @@
           server,
           port,
           room,
-          nick
+          nick,
+          bridge=[]
          }).
 
 %%%===================================================================
@@ -58,12 +59,17 @@
 start_link(Options) ->
     gen_server:start_link(?MODULE, Options, []).
 
+
 %%%===================================================================
 %%% yabot_transport callbacks
 %%%===================================================================
 
 send_message(Ref, Message) ->
     gen_server:call(Ref, {send_message, Message}).
+
+add_bridge(Ref, Peer) ->
+    gen_server:call(Ref, {add_bridge, Peer}).
+
 
 %%%===================================================================
 %%% xmpp api
@@ -74,6 +80,7 @@ join_room(Ref, Room, Nick) ->
 
 leave_room(Ref, Room) ->
     gen_server:call(Ref, {leave_room, Room}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -149,6 +156,8 @@ handle_call({join_room, Room, Nick}, _From, #state{ room=OldRoom }=State) ->
     {reply, ok, join(Room, Nick, "Ready", leave(OldRoom, State))};
 handle_call({leave_room, Room}, _From, #state{ room=Room }=State) ->
     {reply, ok, leave(Room, State)};
+handle_call({add_bridge, Peer}, _From, #state{ bridge=Peers }=State) ->
+    {reply, ok, State#state{ bridge=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -204,15 +213,18 @@ handle_info(#received_packet{
                type_attr=Attr,
                from=From,
                raw_packet=Packet }, 
-            State) ->
+            #state{ bridge=Bridge }=State) ->
     io:format("~p received ~p ~s from ~s~n", 
               [?MODULE, Type, Attr, 
                exmpp_jid:to_list(
                  exmpp_jid:make(From))]),
     case Type of
         message ->
-            io:format("~s~n", 
-                      [exmpp_message:get_body(Packet)]);
+            Message=exmpp_message:get_body(Packet),
+            io:format("~s~n", [Message]),
+            {_, _, Sender}=From,
+            Msg = io:format("[~s] ~s", [Sender, Message]),
+            [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge];
         iq ->
             io:format("~s~n", [exmpp_xml:document_to_list(Packet)]);
         _ ->

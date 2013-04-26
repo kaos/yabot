@@ -22,3 +22,4 @@
 -type server_ref() :: name() | name_node() | global_name() | via_name() | pid().
 
 -callback send_message(ServerRef :: server_ref(), Message :: string()) -> Reply :: term().
+-callback add_bridge(ServerRef :: server_ref(), Peer :: term()) -> ok.

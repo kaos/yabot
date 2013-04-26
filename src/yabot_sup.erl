@@ -22,6 +22,7 @@
          start_link/0,
          start_client/2,
          start_client/3,
+         add_bridge/2,
          send_message/2,
          client_req/3
         ]).
@@ -44,6 +45,9 @@ start_client(Id, Mod, Options) ->
       ?MODULE,
       {Id, {Mod, start_link, [Options]}, transient, 5000, worker, [Mod]}
      ).
+
+add_bridge(Src, Dst) ->
+    client_req(Src, add_bridge, [Dst]).
 
 send_message(Id, Message) ->
     client_req(Id, send_message, [Message]).
