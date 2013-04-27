@@ -30,20 +30,24 @@
 %% Supervisor callbacks
 -export([init/1]).
 
+
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    Clients = case application:get_env(yabot, clients) of
+                  {ok, C} when is_list(C) -> C;
+                  _ -> []
+              end,
+    supervisor:start_link({local, ?MODULE}, ?MODULE, Clients).
 
 start_client(Mod, Options) ->
     start_client(Mod, Mod, Options).
 
 start_client(Id, Mod, Options) ->
     supervisor:start_child(
-      ?MODULE,
-      {Id, {Mod, start_link, [Options]}, transient, 5000, worker, [Mod]}
+      ?MODULE, child_spec(Id, Mod, Options)
      ).
 
 add_bridge(Src, Dst) ->
@@ -55,15 +59,26 @@ send_message(Id, Message) ->
 client_req(Id, Fun, Args) ->
     case client(Id) of
         {Id, Pid, _, [Mod|_]} ->
-            erlang:apply(Mod, Fun, [Pid|Args])
+            erlang:apply(Mod, Fun, [Pid|Args]);
+        Error -> {error, Error}
     end.
+
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
-init([]) ->
-    {ok, { {one_for_one, 1, 10}, []} }.
+init(Clients) ->
+    {ok, { 
+       {one_for_one, 1, 10}, 
+       [child_spec(Id, Mod, Options) || {Id, Mod, Options} <- Clients]
+      } 
+    }.
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
 
 client(Id) ->
     case lists:keyfind(
@@ -74,3 +89,6 @@ client(Id) ->
         Client ->
             Client
     end.
+
+child_spec(Id, Mod, Options) ->
+    {Id, {Mod, start_link, [Options]}, transient, 5000, worker, [Mod]}.

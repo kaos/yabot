@@ -20,6 +20,10 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
+%% Api
+-export([start/0, stop/0]).
+
+
 %% ===================================================================
 %% Application callbacks
 %% ===================================================================
@@ -28,4 +32,13 @@ start(_StartType, _StartArgs) ->
     yabot_sup:start_link().
 
 stop(_State) ->
+    [application:stop(App) || App <- [exmpp, eircc]],
     ok.
+
+%% ===================================================================
+
+start() ->
+    application:start(yabot).
+
+stop() ->
+    application:stop(yabot).
