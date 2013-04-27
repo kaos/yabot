@@ -157,8 +157,9 @@ handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, State) ->
     io:format("~p got private message from ~p: ~p~n", [?MODULE, Sender, Message]),
     {noreply, State};
 handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridge=Bridge }=State) ->
-    io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, Message]),
-    Msg = io_lib:format("[~s] ~s", [Sender, Message]),
+    M = normalize_msg(Message),
+    io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, M]),
+    Msg = io_lib:format("[~s] ~s", [Sender, M]),
     [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge],
     {noreply, State};
 handle_info(_Info, State) ->
@@ -197,3 +198,8 @@ code_change(_OldVsn, State, _Extra) ->
 send(Message, State) ->
     eircc_sup:send_message(State#state.irc, Message),
     State.
+
+normalize_msg("ACTION " ++ Action) ->
+    "/me " ++ Action -- "$";
+normalize_msg(Msg) ->
+    Msg.
