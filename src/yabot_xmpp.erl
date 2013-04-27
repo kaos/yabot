@@ -219,6 +219,7 @@ handle_info(#received_packet{
     io:format("~p received ~p ~s from ~s~n", 
               [?MODULE, Type, Attr, 
                exmpp_jid:to_list(Jid)]),
+    %% aaww, this is ugly...
     case Type of
         message ->
             Message=exmpp_message:get_body(Packet),
@@ -231,9 +232,7 @@ handle_info(#received_packet{
                     case State#state.nick of
                         Sender -> nop;
                         _ ->
-                            Msg = io_lib:format("[~s] ~s", [Sender, Message]),
-                            %%io:format("~p bridge message to ~p: ~p~n", [?MODULE, Bridge, Msg]),
-                            [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge]
+                            yabot_bridge:message(Sender, Message, Bridge)
                     end
             end;
         iq ->

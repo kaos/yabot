@@ -159,8 +159,7 @@ handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, State) ->
 handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridge=Bridge }=State) ->
     M = normalize_msg(Message),
     io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, M]),
-    Msg = io_lib:format("[~s] ~s", [Sender, M]),
-    [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge],
+    yabot_bridge:message(Sender, M, Bridge),
     {noreply, State};
 handle_info(_Info, State) ->
     io:format("~p got: ~p~n", [?MODULE, _Info]),
