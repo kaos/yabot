@@ -106,7 +106,7 @@ init(Options) ->
     Jid = exmpp_jid:make(User, Server, random),
     exmpp_session:auth(
       Session, Jid, 
-      proplists:get_value(password, Options),
+      proplists:get_value(pass, Options),
       proplists:get_value(method, Options, digest)
      ),
     {ok, #state{ 
