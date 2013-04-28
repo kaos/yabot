@@ -15,11 +15,36 @@
 %%
 -module(yabot_client).
 
+-include("yabot.hrl").
+
 -type name() :: atom().
 -type name_node() :: {name(),node()}.
 -type global_name() :: {global, GlobalName::term()}.
 -type via_name() :: {via, Module::atom(), ViaName::term()}.
 -type server_ref() :: name() | name_node() | global_name() | via_name() | pid().
 
--callback send_message(ServerRef :: server_ref(), Message :: string()) -> Reply :: term().
 -callback add_bridge(ServerRef :: server_ref(), Peer :: term()) -> ok.
+-callback send_message(ServerRef :: server_ref(), Message :: string()) -> Reply :: term().
+-callback recv_message(ServerRef :: server_ref(), Message :: #yabot_msg{}) -> Reply :: term().
+     
+
+%% API
+-export([
+         add_bridge/2,
+         send_message/2,
+         recv_message/2
+        ]).
+
+
+%%%===================================================================
+%%% API functions
+%%%===================================================================
+
+add_bridge(Src, Dst) ->
+    yabot_sup:client_req(Src, add_bridge, [Dst]).
+
+send_message(Id, Message) ->
+    yabot_sup:client_req(Id, send_message, [Message]).
+
+recv_message(Ref, #yabot_msg{}=Message) ->
+    yabot_sup:client_req(Ref, recv_message, [Message]).

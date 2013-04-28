@@ -26,7 +26,7 @@
 
 message(Nick, Message, Bridge) ->
     Msg = prepare_message(Nick, Message),
-    [yabot_sup:send_message(Ref, Msg) || Ref <- Bridge].
+    [yabot_client:send_message(Id, Msg) || Id <- Bridge].
     
 
 %%%===================================================================

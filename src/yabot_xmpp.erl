@@ -26,11 +26,16 @@
          terminate/2, code_change/3]).
 
 %% yabot_client callbacks
--export([send_message/2, add_bridge/2]).
+-export([
+         add_bridge/2,
+         send_message/2,
+         recv_message/2
+]).
 
 %% xmpp specific api
 -export([join_room/3, leave_room/2]).
 
+-include("yabot.hrl").
 -include_lib("exmpp/include/exmpp.hrl").
 -include_lib("exmpp/include/exmpp_client.hrl").
 
@@ -64,22 +69,29 @@ start_link(Options) ->
 %%% yabot_client callbacks
 %%%===================================================================
 
+add_bridge(Ref, Peer) ->
+    gen_server:call(Ref, {add_bridge, Peer}).
+
 send_message(Ref, Message) ->
     gen_server:call(Ref, {send_message, Message}).
 
-add_bridge(Ref, Peer) ->
-    gen_server:call(Ref, {add_bridge, Peer}).
+recv_message(_Ref, _Message) ->
+    ok. %gen_server:call(Ref, {recv_message, Message}).
 
 
 %%%===================================================================
 %%% xmpp api
 %%%===================================================================
 
-join_room(Ref, Room, Nick) ->
-    gen_server:call(Ref, {join_room, Room, Nick}).
+join_room(Ref, Room, Nick) when is_pid(Ref) ->
+    gen_server:call(Ref, {join_room, Room, Nick});
+join_room(Id, Room, Nick) ->
+    yabot_sup:client_req(Id, join_room, [Room, Nick]).
 
-leave_room(Ref, Room) ->
-    gen_server:call(Ref, {leave_room, Room}).
+leave_room(Ref, Room) when is_pid(Ref) ->
+    gen_server:call(Ref, {leave_room, Room});
+leave_room(Id, Room) ->
+    yabot_sup:client_req(Id, leave_room, [Room]).
 
 
 %%%===================================================================

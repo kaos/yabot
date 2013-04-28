@@ -26,11 +26,17 @@
          terminate/2, code_change/3]).
 
 %% yabot_client callbacks
--export([send_message/2, add_bridge/2]).
+-export([
+         add_bridge/2,
+         send_message/2,
+         recv_message/2
+]).
+
 
 %% irc specific api
 -export([join_channel/2, leave_channel/2]).
 
+-include("yabot.hrl").
 -include_lib("eircc/include/eircc.hrl").
 
 -define(SERVER, ?MODULE). 
@@ -59,22 +65,29 @@ start_link(Options) ->
 %%% yabot_client callbacks
 %%%===================================================================
 
+add_bridge(Ref, Peer) ->
+    gen_server:call(Ref, {add_bridge, Peer}).
+
 send_message(Ref, Message) ->
     gen_server:call(Ref, {send_message, Message}).
 
-add_bridge(Ref, Peer) ->
-    gen_server:call(Ref, {add_bridge, Peer}).
+recv_message(_Ref, _Message) ->
+    ok. %gen_server:call(Ref, {recv_message, Message}).
 
 
 %%%===================================================================
 %%% irc api
 %%%===================================================================
 
-join_channel(Ref, Channel) ->
-    gen_server:call(Ref, {join_channel, Channel}).
+join_channel(Ref, Channel) when is_pid(Ref) ->
+    gen_server:call(Ref, {join_channel, Channel});
+join_channel(Id, Channel) ->
+    yabot_sup:client_req(Id, join_channel, [Channel]).
 
-leave_channel(Ref, Channel) ->
-    gen_server:call(Ref, {leave_channel, Channel}).
+leave_channel(Ref, Channel) when is_pid(Ref) ->
+    gen_server:call(Ref, {leave_channel, Channel});
+leave_channel(Id, Channel) ->
+    yabot_sup:client_req(Id, leave_channel, [Channel]).
 
 
 %%%===================================================================

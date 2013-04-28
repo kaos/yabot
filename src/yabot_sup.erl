@@ -22,8 +22,6 @@
          start_link/0,
          start_client/2,
          start_client/3,
-         add_bridge/2,
-         send_message/2,
          client_req/3
         ]).
 
@@ -50,14 +48,6 @@ start_client(Id, Mod, Options) ->
       ?MODULE, child_spec(Id, Mod, Options)
      ).
 
-add_bridge(Src, Dst) ->
-    client_req(Src, add_bridge, [Dst]).
-
-send_message(Id, Message) ->
-    client_req(Id, send_message, [Message]).
-
-%% by exporting client_req/3, client specific funs can be called
-%% that isn't part of the yabot_client behaviour
 client_req(Id, Fun, Args) ->
     case client(Id) of
         {Id, Pid, _, [Mod|_]} ->
