@@ -48,7 +48,6 @@ For IRC, there is a `yabot_irc` client module, that supports the following optio
 - `{chan, "#channel"}`
 - `{nick, "nickname"}`
 - `{pass, "password"}`
-- `{bridge, [client_id(), ...]}`
 
 
 XMPP/Jabber
@@ -60,13 +59,24 @@ For XMPP, there is a `yabot_xmpp` client module, that supports the following opt
 - `{method, <authentication method>}` `password`, `digest` (default), `"PLAIN"`, `"ANONYMOUS"`, `"DIGEST-MD5"`.
 - `{room, "chatroom@server.com"}`
 - `{nick, "nickname"}`
-- `{bridge, [client_id(), ...]}`
 
+
+Common options
+--------------
+
+Options that are client agnostic, and should be supported by all clients:
 
 Bridging
---------
+........
 
-The `bridge` option allows messages received in one channel to be forwarded to other channels.
+The `bridge` option allows messages received in one channel to be forwarded to other channels:
+- `{bridge, [client_id(), ...]}`
+
+Bot
+...
+
+Botting is done by forwarding messages from a client to a bot with the `{bot, [client_id(), ...]}` option:
+- `{bot, [client_id(), ...]}`
 
 
 Run

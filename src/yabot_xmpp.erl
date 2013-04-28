@@ -16,7 +16,7 @@
 -module(yabot_xmpp).
 
 -behaviour(gen_server).
--behaviour(yabot_transport).
+-behaviour(yabot_client).
 
 %% API
 -export([start_link/1]).
@@ -25,7 +25,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-%% yabot_transport callbacks
+%% yabot_client callbacks
 -export([send_message/2, add_bridge/2]).
 
 %% xmpp specific api
@@ -61,7 +61,7 @@ start_link(Options) ->
 
 
 %%%===================================================================
-%%% yabot_transport callbacks
+%%% yabot_client callbacks
 %%%===================================================================
 
 send_message(Ref, Message) ->

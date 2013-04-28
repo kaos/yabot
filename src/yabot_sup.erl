@@ -56,6 +56,8 @@ add_bridge(Src, Dst) ->
 send_message(Id, Message) ->
     client_req(Id, send_message, [Message]).
 
+%% by exporting client_req/3, client specific funs can be called
+%% that isn't part of the yabot_client behaviour
 client_req(Id, Fun, Args) ->
     case client(Id) of
         {Id, Pid, _, [Mod|_]} ->

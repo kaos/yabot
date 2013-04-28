@@ -13,7 +13,7 @@
 %%  See the License for the specific language governing permissions and
 %%  limitations under the License.
 %%
--module(yabot_transport).
+-module(yabot_client).
 
 -type name() :: atom().
 -type name_node() :: {name(),node()}.
