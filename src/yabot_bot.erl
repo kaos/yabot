@@ -35,8 +35,17 @@
 
 -define(SERVER, ?MODULE). 
 
+-record(cmd, {
+          name,
+          exec,
+          args,
+          synopsis,
+          help
+         }).
+
 -record(state, {
           nick,
+          cmds=[],
           bridges=[]
          }).
 
@@ -72,6 +81,7 @@ handle_message(Ref, Message) ->
 init(Options) ->
     {ok, #state{
             nick=proplists:get_value(nick, Options, "yabot"),
+            cmds=parse_cmds(proplists:get_value(cmds, Options, [])),
             bridges=yabot:list_opt(bridges, Options)
            }
     }.
@@ -85,7 +95,7 @@ handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
-    
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -139,7 +149,7 @@ parse(Message, Sender) ->
     case string:tokens(Message, " ") of
         [Command|Args] ->
             try
-                {list_to_existing_atom(Command), Args}
+                {cmd_to_atom(Command), Args}
             catch 
                 error:badarg ->
                     io_lib:format(
@@ -149,28 +159,121 @@ parse(Message, Sender) ->
         _ -> []
     end.
 
+cmd_to_atom(Command) ->
+    list_to_existing_atom(
+      lists:foldl(
+        fun(C, S) ->
+                string:strip(S, both, C)
+        end,
+        string:to_lower(Command),
+        [$,,$:,$!,$-,$/]
+       )).
+
+list_synopsis(#state{ cmds=[] }) -> [];
+list_synopsis(#state{ cmds=Cmds }) -> 
+    "I also respond to these commands:\r\n"
+        ++ string:join([S || #cmd{ synopsis=S } <- Cmds], ", ").
+
 reply(Message, State) ->    
     {#yabot_msg{ message=Message }, State}.
-    
+
 process_command(Message, State) when is_list(Message) ->
     %% failed to parse, so we got the reply already
     reply(Message, State);
 process_command({echo, Args}, State) ->
     reply(string:join(Args, " "), State);
-process_command({help, Args}, State) ->
-    Response = case Args of
-                   [] -> "Currently, I don't do much, but you can try 'echo some message...' and see what you get ;-P\r\n"
-                             ++ "- Altough, 'help nick' will tell you what I listen to in the chat rooms.\r\n"
-                             ++ "- (in case it is different from my \"real\" nick,\r\n"
-                             ++ "-  or maybe there's more of me under different nicks).";
-                   ["nick"|_] -> io_lib:format("I listen to the name ~s.", [State#state.nick]);
-                   ["echo"|_] -> "Ok, ok. Nothing much to say about echo, really.";
-                   [Cmd|_] -> io_lib:format("Sorry, I don't know anything about ~s.", [Cmd])
+process_command({hi, _}, State) ->
+    reply("Hi!", State);
+process_command({help, []}, State) ->
+    reply(
+      "Currently, I don't do much, but you can try 'echo some message...' and see what you get ;-P\r\n"
+      ++ "- Altough, 'help nick' will tell you what I listen to in the chat rooms.\r\n"
+      ++ "- (in case it is different from my \"real\" nick,\r\n"
+      ++ "-  or maybe there's more of me under different nicks).\r\n"
+      ++ list_synopsis(State),
+      State);
+process_command({help, [Cmd|_]}, State) ->
+    Response = try
+                   Command = cmd_to_atom(Cmd), 
+                   case Command of
+                       nick -> io_lib:format("I listen to the name ~s.", [State#state.nick]);
+                       echo -> "Ok, ok. Nothing much to say about echo, really.";
+                       _ -> 
+                           case lists:keyfind(
+                                  Command,
+                                  #cmd.name, 
+                                  State#state.cmds) 
+                           of
+                               false -> error(badarg);
+                               #cmd{ help=Help } -> Help
+                           end
+                   end
+               catch
+                   error:badarg ->
+                       io_lib:format("Sorry, I don't know anything about ~s.", [Cmd])
                end,
     reply(Response, State);
-process_command({Cmd, _Args}, State) ->
+process_command({Cmd, Args}, #state{ cmds=Cmds }=State) ->
+    case lists:keyfind(Cmd, #cmd.name, Cmds) of
+        false ->
+            reply(
+              io_lib:format(
+                "Uh-oh, I don't know what to do with '~s'.",
+                [Cmd]),
+              State);
+        CmdDef ->
+            run_cmd(CmdDef, Args, State)
+    end.
+
+parse_cmds(Cmds) ->
+    [parse_cmd(Cmd) || Cmd <- Cmds].
+
+parse_cmd({exec, Name, Cmd, Args, Synopsis, Help}) ->
+    #cmd{
+       name=Name,
+       exec=Cmd,
+       args=Args,
+       synopsis=Synopsis,
+       help=Help
+      }.
+
+run_cmd(#cmd{ exec=Exec, args=Spec }=Cmd, Args, State) ->
     reply(
-      io_lib:format(
-        "Uh-oh, I don't know what to do with '~s'.",
-       [Cmd]),
-     State).
+      case args_ok(Spec, length(Args)) of
+          ok ->
+              os:cmd(cmd_string(Exec, Args));
+          Oops ->
+              io_lib:format("~s~nusage: ~s", [Oops, Cmd#cmd.synopsis])
+      end,
+      State).
+
+args_ok({Min, Max}, Num) 
+  when Min =< Num, Max >= Num ->
+    ok;
+args_ok(Count, Num) when Count == Num ->
+    ok;
+args_ok({Min, Max}, Num) ->
+    io_lib:format("expected ~b-~b args, got ~b.", [Min, Max, Num]);
+args_ok(Count, Num) ->
+    io_lib:format("expected ~b arg~s, got ~b.", [Count, pl(Count), Num]).
+
+pl(1) -> "";
+pl(_) -> "s".
+
+cmd_string(Exec, Args) ->
+    string:join(
+      [Exec|[os_escape(Arg) || Arg <- [Args]]],
+      " "
+     ).
+
+os_escape([]) ->
+    [];
+os_escape(Arg) ->
+    os_escape(Arg, [$"]).
+
+os_escape([], Acc) ->
+    lists:reverse([$"|Acc]);
+os_escape([$"|Arg], Acc) ->
+    os_escape(Arg, [$",$\\|Acc]);
+os_escape([C|Arg], Acc) ->
+    os_escape(Arg, [C|Acc]).

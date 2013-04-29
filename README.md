@@ -67,8 +67,25 @@ The `yabot_bot` can respond to messages it receives from other clients (forwarde
 
 Bot options:
 - `{nick, "nickname"}`
+- `{cmds, [cmd()]}`
 
 Nick name the bot should listen to in chat rooms/channels.
+
+Bot Commands
+............
+
+The `cmd()` type has the following spec:
+
+```erlang
+-spec cmd() :: {exec, Name :: atom(), Command :: string(), Args :: integer() | {Min :: integer(), Max :: integer()},
+    Synopsis :: string(), Help :: string()}
+```
+
+The command string is any executable file on the host system that you want to expose. The output from `stdout` is
+routed back as reply to the command.
+
+Args is a constraint on the number of args that is acceptable. This way it is possible to call sensitive commands
+that may have a query mode when called without args, for instance.
 
 
 Common options
