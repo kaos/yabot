@@ -126,12 +126,12 @@ init(Options) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({handle_message, Message}, _From, State) ->
-    yabot:bridge_message(Message, State#state.bridges),
+    %% noo.. don't do that: yabot:bridge_message(Message, State#state.bridges),
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
                  _ -> send(yabot:message_to_list(Message), State)
              end,
-    {reply, ok, State1};
+    {reply, [], State1};
 handle_call({join_channel, _Channel}, _From, State) ->
     {reply, ok, State};
 handle_call({leave_channel, _Channel}, _From, State) ->

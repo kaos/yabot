@@ -144,7 +144,7 @@ init(Options) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({handle_message, Message}, _From, State) ->
-    Replies = yabot:bridge_message(Message, State#state.bridges),
+    %% no, don't do that: Replies = yabot:bridge_message(Message, State#state.bridges),
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
                  _ ->
@@ -154,7 +154,7 @@ handle_call({handle_message, Message}, _From, State) ->
                        State#state.room,
                        State)
              end,
-    {reply, Replies, State1};
+    {reply, [], State1};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room, nick=Nick }=State) ->
     {reply, ok, State};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room }=State) ->
@@ -321,7 +321,7 @@ process_packet(_Type, _Attr, _From, _Packet, State) ->
 process_message(_Attr, undefined, _From, Packet, State) ->
     io:format("~s~n", [exmpp_xml:document_to_list(Packet)]),
     State;
-process_message(groupchat, Message, From, Packet, #state{ nick=Me }=State) ->
+process_message("groupchat", Message, From, Packet, #state{ nick=Me }=State) ->
     case exmpp_jid:resource(From) of
         Me -> 
             State;
@@ -336,7 +336,7 @@ process_message(groupchat, Message, From, Packet, #state{ nick=Me }=State) ->
                         State#state.bridges),
             send_replies(Replies, Channel, Packet, State)
     end;
-process_message(chat, Message, From, Packet, #state{ bridges=Bridges }=State) ->
+process_message("chat", Message, From, Packet, #state{ bridges=Bridges }=State) ->
     Replies = yabot:bridge_message(#yabot_msg{ from=From, message=Message }, Bridges),
     send_replies(Replies, From, Packet, State).
 

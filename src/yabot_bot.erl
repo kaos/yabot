@@ -104,20 +104,73 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-process_message(Message, State) when is_list(Message) ->
-    %% dummy, echo back everything..
-    {#yabot_msg{ message=Message }, State};
 process_message(#yabot_msg{ channel=undefined, message=Message }, State) ->
-    process_message(Message, State);
-process_message(#yabot_msg{ message=Message }, #state{ nick=Me }=State) ->
+    process_command(parse(Message, undefined), State);
+process_message(#yabot_msg{ from=Sender, message=Message }, #state{ nick=Me }=State) 
+  when is_list(Message) ->
     case string:str(Message, Me) of
         1 ->
-            process_message(
-              string:substr(Message, 1 + string:len(Me)),
+            process_command(
+              parse(
+                string:substr(Message, 1 + string:len(Me)), 
+                Sender),
               State
              );
         _ ->
             {[], State}
     end;
+process_message(#yabot_msg{ message=Message }=Msg, State)
+  when is_binary(Message) ->
+    process_message(Msg#yabot_msg{ message=binary_to_list(Message) }, State);
 process_message(_, State) ->
     {[], State}.
+
+adress(undefined) -> [];
+adress(Who) -> 
+    io_lib:format(", ~s", [Who]).
+
+parse(Message, Sender) when is_binary(Message) ->
+    parse(binary_to_list(Message), Sender);
+parse([$,|Message], Sender) ->
+    parse(Message, Sender);
+parse([$:|Message], Sender) ->
+    parse(Message, Sender);
+parse(Message, Sender) ->
+    case string:tokens(Message, " ") of
+        [Command|Args] ->
+            try
+                {list_to_existing_atom(Command), Args}
+            catch 
+                error:badarg ->
+                    io_lib:format(
+                      "Huh?! I don't know what you are talking about~s. (~s)",
+                      [adress(Sender), Command])
+            end;
+        _ -> []
+    end.
+
+reply(Message, State) ->    
+    {#yabot_msg{ message=Message }, State}.
+    
+process_command(Message, State) when is_list(Message) ->
+    %% failed to parse, so we got the reply already
+    reply(Message, State);
+process_command({echo, Args}, State) ->
+    reply(string:join(Args, " "), State);
+process_command({help, Args}, State) ->
+    Response = case Args of
+                   [] -> "Currently, I don't do much, but you can try 'echo some message...' and see what you get ;-P\r\n"
+                             ++ "- Altough, 'help nick' will tell you what I listen to in the chat rooms.\r\n"
+                             ++ "- (in case it is different from my \"real\" nick,\r\n"
+                             ++ "-  or maybe there's more of me under different nicks).";
+                   ["nick"|_] -> io_lib:format("I listen to the name ~s.", [State#state.nick]);
+                   ["echo"|_] -> "Ok, ok. Nothing much to say about echo, really.";
+                   [Cmd|_] -> io_lib:format("Sorry, I don't know anything about ~s.", [Cmd])
+               end,
+    reply(Response, State);
+process_command({Cmd, _Args}, State) ->
+    reply(
+      io_lib:format(
+        "Uh-oh, I don't know what to do with '~s'.",
+       [Cmd]),
+     State).
