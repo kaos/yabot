@@ -24,15 +24,13 @@
 -type server_ref() :: name() | name_node() | global_name() | via_name() | pid().
 
 -callback add_bridge(ServerRef :: server_ref(), Peer :: term()) -> ok.
--callback send_message(ServerRef :: server_ref(), Message :: string()) -> Reply :: term().
--callback recv_message(ServerRef :: server_ref(), Message :: #yabot_msg{}) -> Reply :: term().
+-callback handle_message(ServerRef :: server_ref(), Message :: #yabot_msg{}) -> Reply :: term().
      
 
 %% API
 -export([
          add_bridge/2,
-         send_message/2,
-         recv_message/2
+         handle_message/2
         ]).
 
 
@@ -43,8 +41,5 @@
 add_bridge(Src, Dst) ->
     yabot_sup:client_req(Src, add_bridge, [Dst]).
 
-send_message(Id, Message) ->
-    yabot_sup:client_req(Id, send_message, [Message]).
-
-recv_message(Ref, #yabot_msg{}=Message) ->
-    yabot_sup:client_req(Ref, recv_message, [Message]).
+handle_message(Id, #yabot_msg{}=Message) ->
+    yabot_sup:client_req(Id, handle_message, [Message]).

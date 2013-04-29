@@ -28,9 +28,7 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         add_bot/2,
-         send_message/2,
-         recv_message/2
+         handle_message/2
         ]).
 
 -include("yabot.hrl").
@@ -38,7 +36,6 @@
 -define(SERVER, ?MODULE). 
 
 -record(state, {
-          bots=[],
           bridges=[]
          }).
 
@@ -58,14 +55,8 @@ start_link(Options) ->
 add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
-add_bot(Ref, Peer) ->
-    gen_server:call(Ref, {add_bot, Peer}).
-
-send_message(Ref, Message) ->
-    gen_server:call(Ref, {send_message, Message}).
-
-recv_message(_Ref, _Message) ->
-    gen_server:call(Ref, {recv_message, Message}).
+handle_message(Ref, Message) ->
+    gen_server:call(Ref, {handle_message, Message}).
 
 
 %%%===================================================================
@@ -79,15 +70,15 @@ recv_message(_Ref, _Message) ->
 
 init(Options) ->
     {ok, #state{
-            bots=yabot:list_opt(bots, Options),
             bridges=yabot:list_opt(bridges, Options)
            }
     }.
 
+handle_call({handle_message, Message}, _From, State) ->
+    yabot:bridge_message(Message, State#state.bridges),
+    {reply, ok, State};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
-handle_call({add_bot, Peer}, _From, #state{ bots=Peers }=State) ->
-    {reply, ok, State#state{ bots=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.

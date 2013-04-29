@@ -28,10 +28,8 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         add_bot/2,
-         send_message/2,
-         recv_message/2
-]).
+         handle_message/2
+        ]).
 
 
 %% irc specific api
@@ -44,7 +42,6 @@
 
 -record(state, {
           irc,
-          bots=[],
           bridges=[]
          }).
 
@@ -70,14 +67,8 @@ start_link(Options) ->
 add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
-add_bot(Ref, Peer) ->
-    gen_server:call(Ref, {add_bot, Peer}).
-
-send_message(Ref, Message) ->
-    gen_server:call(Ref, {send_message, Message}).
-
-recv_message(_Ref, _Message) ->
-    ok. %gen_server:call(Ref, {recv_message, Message}).
+handle_message(Ref, Message) ->
+    gen_server:call(Ref, {handle_message, Message}).
 
 
 %%%===================================================================
@@ -115,7 +106,6 @@ init(Options) ->
     {ok, Irc} = eircc_sup:start_client(Options),
     {ok, #state{ 
             irc=Irc,
-            bots=yabot:list_opt(bots, Options),
             bridges=yabot:list_opt(bridges, Options)
            }
     }.
@@ -135,16 +125,19 @@ init(Options) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({send_message, Message}, _From, State) ->
-    {reply, ok, send(Message, State)};
+handle_call({handle_message, Message}, _From, State) ->
+    yabot:bridge_message(Message, State#state.bridges),
+    State1 = case Message#yabot_msg.channel of
+                 undefined -> State;
+                 _ -> send(yabot:message_to_list(Message), State)
+             end,
+    {reply, ok, State1};
 handle_call({join_channel, _Channel}, _From, State) ->
     {reply, ok, State};
 handle_call({leave_channel, _Channel}, _From, State) ->
     {reply, ok, State};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
-handle_call({add_bot, Peer}, _From, #state{ bots=Peers }=State) ->
-    {reply, ok, State#state{ bots=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -172,14 +165,14 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, #state{ bots=Bots }=State) ->
+handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, #state{ bridges=Bridges }=State) ->
     io:format("~p got private message from ~p: ~p~n", [?MODULE, Sender, Message]),
-    yabot:forward_message(#yabot_msg{ from=Sender, message=Message }, Bots),
+    yabot:bridge_message(#yabot_msg{ from=Sender, message=Message }, Bridges),
     {noreply, State};
-handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridges=Bridge }=State) ->
+handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridges=Bridges }=State) ->
     M = #yabot_msg{ channel=Channel, from=Sender, message=normalize_msg(Message) },
     io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, M#yabot_msg.message]),
-    yabot:bridge_message(M, Bridge),
+    yabot:bridge_message(M, Bridges),
     {noreply, State};
 handle_info(_Info, State) ->
     io:format("~p got: ~p~n", [?MODULE, _Info]),

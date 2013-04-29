@@ -28,9 +28,7 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         add_bot/2,
-         send_message/2,
-         recv_message/2
+         handle_message/2
         ]).
 
 %% xmpp specific api
@@ -48,7 +46,6 @@
           port,
           room,
           nick,
-          bots=[],
           bridges=[]
          }).
 
@@ -74,14 +71,8 @@ start_link(Options) ->
 add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
-add_bot(Ref, Peer) ->
-    gen_server:call(Ref, {add_bot, Peer}).
-
-send_message(Ref, Message) ->
-    gen_server:call(Ref, {send_message, Message}).
-
-recv_message(_Ref, _Message) ->
-    ok. %gen_server:call(Ref, {recv_message, Message}).
+handle_message(Ref, Message) ->
+    gen_server:call(Ref, {handle_message, Message}).
 
 
 %%%===================================================================
@@ -132,7 +123,6 @@ init(Options) ->
             port=proplists:get_value(port, Options, default),
             room=proplists:get_value(room, Options),
             nick=exmpp_utils:any_to_binary(proplists:get_value(nick, Options, "yabot")),
-            bots=yabot:list_opt(bots, Options),
             bridges=yabot:list_opt(bridges, Options)
            },
      0
@@ -153,14 +143,18 @@ init(Options) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({send_message, Message}, _From, State) ->
-    {
-      reply, ok,
-      send( 
-        exmpp_message:groupchat(Message),
-        State#state.room,
-        State)
-    };
+handle_call({handle_message, Message}, _From, State) ->
+    yabot:bridge_message(Message, State#state.bridges),
+    State1 = case Message#yabot_msg.channel of
+                 undefined -> State;
+                 _ ->
+                     send( 
+                       exmpp_message:groupchat(
+                         yabot:message_to_list(Message)),
+                       State#state.room,
+                       State)
+             end,
+    {reply, ok, State1};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room, nick=Nick }=State) ->
     {reply, ok, State};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room }=State) ->
@@ -177,8 +171,6 @@ handle_call({leave_room, Room}, _From, #state{ room=Room }=State) ->
     {reply, ok, leave(Room, State)};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
-handle_call({add_bot, Peer}, _From, #state{ bots=Peers }=State) ->
-    {reply, ok, State#state{ bots=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -342,6 +334,6 @@ process_message(groupchat, Message, From, _Packet, #state{ nick=Me }=State) ->
               State#state.bridges)
     end,
     State;
-process_message(chat, Message, From, _Packet, #state{ bots=Bots }=State) ->
-    yabot:forward_message(#yabot_msg{ from=From, message=Message }, Bots),
+process_message(chat, Message, From, _Packet, #state{ bridges=Bridges }=State) ->
+    yabot:bridge_message(#yabot_msg{ from=From, message=Message }, Bridges),
     State.

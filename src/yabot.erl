@@ -22,7 +22,7 @@
          start/0, stop/0,
          list_opt/2,
          bridge_message/2,
-         forward_message/2
+         message_to_list/1
         ]).
 
 
@@ -44,21 +44,19 @@ list_opt(Key, Opts) ->
             [Value]
     end.
 
-bridge_message(#yabot_msg{ from=Nick, message=Message }, Bridge) ->
-    Msg = prepare_message(Nick, Message),
-    [yabot_client:send_message(Id, Msg) || Id <- Bridge].
+bridge_message(#yabot_msg{}=Msg, Dsts) ->
+    [yabot_client:handle_message(Id, Msg) || Id <- Dsts].
     
-forward_message(#yabot_msg{}=Msg, Dsts) ->
-    [yabot_client:recv_message(Id, Msg) || Id <- Dsts].
+message_to_list(#yabot_msg{ from=Nick, message=Message }) ->    
+    format_message(Nick, Message).
 
-    
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-prepare_message(Nick, "/me " ++ Message) ->
+format_message(Nick, "/me " ++ Message) ->
     io_lib:format("/me [~s] ~s", [Nick, Message]);
-prepare_message(Nick, <<"/me ", Message/binary>>) ->
+format_message(Nick, <<"/me ", Message/binary>>) ->
     io_lib:format("/me [~s] ~s", [Nick, Message]);
-prepare_message(Nick, Message) ->
+format_message(Nick, Message) ->
     io_lib:format("[~s] ~s", [Nick, Message]).
