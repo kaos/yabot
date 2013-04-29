@@ -13,22 +13,45 @@
 %%  See the License for the specific language governing permissions and
 %%  limitations under the License.
 %%
--module(yabot_bridge).
+-module(yabot).
+
+-include("yabot.hrl").
 
 %% API
 -export([
-         message/3
+         start/0, stop/0,
+         list_opt/2,
+         bridge_message/2,
+         forward_message/2
         ]).
+
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-message(Nick, Message, Bridge) ->
+start() ->
+    application:start(yabot).
+
+stop() ->
+    application:stop(yabot).
+
+list_opt(Key, Opts) ->
+    case proplists:get_value(Key, Opts, []) of
+        List when is_list(List) ->
+            List;
+        Value ->
+            [Value]
+    end.
+
+bridge_message(#yabot_msg{ from=Nick, message=Message }, Bridge) ->
     Msg = prepare_message(Nick, Message),
     [yabot_client:send_message(Id, Msg) || Id <- Bridge].
     
+forward_message(#yabot_msg{}=Msg, Dsts) ->
+    [yabot_client:recv_message(Id, Msg) || Id <- Dsts].
 
+    
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================

@@ -28,9 +28,10 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
+         add_bot/2,
          send_message/2,
          recv_message/2
-]).
+        ]).
 
 %% xmpp specific api
 -export([join_room/3, leave_room/2]).
@@ -47,7 +48,8 @@
           port,
           room,
           nick,
-          bridge=[]
+          bots=[],
+          bridges=[]
          }).
 
 %%%===================================================================
@@ -71,6 +73,9 @@ start_link(Options) ->
 
 add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
+
+add_bot(Ref, Peer) ->
+    gen_server:call(Ref, {add_bot, Peer}).
 
 send_message(Ref, Message) ->
     gen_server:call(Ref, {send_message, Message}).
@@ -127,7 +132,8 @@ init(Options) ->
             port=proplists:get_value(port, Options, default),
             room=proplists:get_value(room, Options),
             nick=exmpp_utils:any_to_binary(proplists:get_value(nick, Options, "yabot")),
-            bridge=proplists:get_value(bridge, Options, [])
+            bots=yabot:list_opt(bots, Options),
+            bridges=yabot:list_opt(bridges, Options)
            },
      0
     }.
@@ -169,8 +175,10 @@ handle_call({join_room, Room, Nick}, _From, #state{ room=OldRoom }=State) ->
     {reply, ok, join(Room, Nick, "Ready", leave(OldRoom, State))};
 handle_call({leave_room, Room}, _From, #state{ room=Room }=State) ->
     {reply, ok, leave(Room, State)};
-handle_call({add_bridge, Peer}, _From, #state{ bridge=Peers }=State) ->
-    {reply, ok, State#state{ bridge=[Peer|Peers]}};
+handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
+    {reply, ok, State#state{ bridges=[Peer|Peers]}};
+handle_call({add_bot, Peer}, _From, #state{ bots=Peers }=State) ->
+    {reply, ok, State#state{ bots=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -226,33 +234,12 @@ handle_info(#received_packet{
                type_attr=Attr,
                from=From,
                raw_packet=Packet }, 
-            #state{ bridge=Bridge }=State) ->
+            State) ->
     Jid = exmpp_jid:make(From),
     io:format("~p received ~p ~s from ~s~n", 
               [?MODULE, Type, Attr, 
                exmpp_jid:to_list(Jid)]),
-    %% aaww, this is ugly...
-    case Type of
-        message ->
-            Message=exmpp_message:get_body(Packet),
-            io:format("~s~n", [Message]),
-            case Message of
-                undefined ->
-                    io:format("~s~n", [exmpp_xml:document_to_list(Packet)]);
-                _ ->
-                    Sender = exmpp_jid:resource(Jid),
-                    case State#state.nick of
-                        Sender -> nop;
-                        _ ->
-                            yabot_bridge:message(Sender, Message, Bridge)
-                    end
-            end;
-        iq ->
-            io:format("~s~n", [exmpp_xml:document_to_list(Packet)]);
-        _ ->
-            nop
-    end,
-    {noreply, State};
+    {noreply, process_packet(Type, Attr, Jid, Packet, State)};
 handle_info(_Info, State) ->
     io:format("~p got: ~p~n", [?MODULE, _Info]),
     {noreply, State}.
@@ -327,3 +314,34 @@ leave(Room, State) ->
 
 muc_room(Room, Nick) ->
     Room ++ "/" ++ Nick.
+
+process_packet(message, Attr, From, Packet, State) ->
+    Message=exmpp_message:get_body(Packet),
+    io:format("~s~n", [Message]),
+    process_message(Attr, Message, From, Packet, State);
+process_packet(iq, _Attr, _From, Packet, State) ->
+    io:format("~s~n", [exmpp_xml:document_to_list(Packet)]),
+    State;
+process_packet(_Type, _Attr, _From, _Packet, State) ->
+    %% Type=presence, most likely :)
+    State.
+
+process_message(_Attr, undefined, _From, Packet, State) ->
+    io:format("~s~n", [exmpp_xml:document_to_list(Packet)]),
+    State;
+process_message(groupchat, Message, From, _Packet, #state{ nick=Me }=State) ->
+    case exmpp_jid:resource(From) of
+        Me -> nop;
+        Sender ->
+            yabot:bridge_message(
+              #yabot_msg{
+                 channel=exmpp_jid:bare_to_binary(From),
+                 from=Sender,
+                 message=Message
+                }, 
+              State#state.bridges)
+    end,
+    State;
+process_message(chat, Message, From, _Packet, #state{ bots=Bots }=State) ->
+    yabot:forward_message(#yabot_msg{ from=From, message=Message }, Bots),
+    State.

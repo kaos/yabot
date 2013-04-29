@@ -69,14 +69,14 @@ Options that are client agnostic, and should be supported by all clients:
 Bridging
 ........
 
-The `bridge` option allows messages received in one channel to be forwarded to other channels:
-- `{bridge, [client_id(), ...]}`
+The `bridges` option allows messages received in one channel to be forwarded to other channels:
+- `{bridges, [client_id(), ...]}`
 
-Bot
-...
+Bots
+....
 
-Botting is done by forwarding messages from a client to a bot with the `{bot, [client_id(), ...]}` option:
-- `{bot, [client_id(), ...]}`
+Botting is done by forwarding messages from a client to a bot:
+- `{bots, [client_id(), ...]}`
 
 
 Run

@@ -4,4 +4,4 @@ if [ -f yabot.config ]; then
     CONFIG="-config yabot.config"
 fi
 
-erl -pa ebin deps/*/ebin ${CONFIG} -s yabot_app
+erl -pa ebin deps/*/ebin ${CONFIG} -s yabot
