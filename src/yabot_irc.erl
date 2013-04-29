@@ -167,12 +167,14 @@ handle_cast(_Msg, State) ->
 %%--------------------------------------------------------------------
 handle_info(#eircc{ channel=undefined, from=Sender, message=Message}, #state{ bridges=Bridges }=State) ->
     io:format("~p got private message from ~p: ~p~n", [?MODULE, Sender, Message]),
-    yabot:bridge_message(#yabot_msg{ from=Sender, message=Message }, Bridges),
+    Replies = yabot:bridge_message(#yabot_msg{ from=Sender, message=Message }, Bridges),
+    send_replies(Replies, Sender, State),
     {noreply, State};
 handle_info(#eircc{ channel=Channel, from=Sender, message=Message}, #state{ bridges=Bridges }=State) ->
     M = #yabot_msg{ channel=Channel, from=Sender, message=normalize_msg(Message) },
     io:format("~p got message from ~s/~s: ~p~n", [?MODULE, Channel, Sender, M#yabot_msg.message]),
-    yabot:bridge_message(M, Bridges),
+    Replies = yabot:bridge_message(M, Bridges),
+    send_replies(Replies, undefined, State),
     {noreply, State};
 handle_info(_Info, State) ->
     io:format("~p got: ~p~n", [?MODULE, _Info]),
@@ -215,3 +217,9 @@ normalize_msg("ACTION " ++ Action) ->
     "/me " ++ Action -- "$";
 normalize_msg(Msg) ->
     Msg.
+
+send_replies([], _To, _State) -> nop;
+send_replies(Replies, undefined, State) ->
+    [send(yabot:message_to_list(Reply), State) || Reply <- Replies];
+send_replies(Replies, To, State) ->
+    [send({say, To, yabot:message_to_list(Reply)}, State) || Reply <- Replies].

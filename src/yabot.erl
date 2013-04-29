@@ -44,10 +44,16 @@ list_opt(Key, Opts) ->
             [Value]
     end.
 
+bridge_message(_, []) -> [];
 bridge_message(#yabot_msg{}=Msg, Dsts) ->
-    [yabot_client:handle_message(Id, Msg) || Id <- Dsts].
+    lists:flatten(
+      [yabot_client:handle_message(Id, Msg) 
+       || Id <- Dsts]
+     ).
     
-message_to_list(#yabot_msg{ from=Nick, message=Message }) ->    
+message_to_list(#yabot_msg{ from=undefined, message=Message }) ->
+    Message;
+message_to_list(#yabot_msg{ from=Nick, message=Message }) ->
     format_message(Nick, Message).
 
 %%%===================================================================

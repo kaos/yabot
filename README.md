@@ -19,9 +19,8 @@ make
 Configure
 =========
 
-Create a `yabot.config` file (or tweak `start.sh` or call it with `CONFIG=foo.config ./start.sh`).
+Create a config file. Look at `example.config` for ideas.
 
-Look at `example.config` for ideas.
 The parts are:
 
 ```erlang
@@ -66,6 +65,11 @@ Bot
 
 The `yabot_bot` can respond to messages it receives from other clients (forwarded using the `bridges` option).
 
+Bot options:
+- `{nick, "nickname"}`
+
+Nick name the bot should listen to in chat rooms/channels.
+
 
 Common options
 --------------
@@ -86,5 +90,7 @@ Run
 ===
 
 ```
-./start.sh
+./start.sh <config-file>
 ```
+
+If no config file is specified, `yabot.config` is used if it exists in the current directory.

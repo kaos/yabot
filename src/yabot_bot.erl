@@ -36,6 +36,7 @@
 -define(SERVER, ?MODULE). 
 
 -record(state, {
+          nick,
           bridges=[]
          }).
 
@@ -70,13 +71,15 @@ handle_message(Ref, Message) ->
 
 init(Options) ->
     {ok, #state{
+            nick=proplists:get_value(nick, Options, "yabot"),
             bridges=yabot:list_opt(bridges, Options)
            }
     }.
 
 handle_call({handle_message, Message}, _From, State) ->
-    yabot:bridge_message(Message, State#state.bridges),
-    {reply, ok, State};
+    Replies = yabot:bridge_message(Message, State#state.bridges),
+    {Reply, State1} = process_message(Message, State),
+    {reply, [Reply|Replies], State1};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
@@ -100,3 +103,21 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+process_message(Message, State) when is_list(Message) ->
+    %% dummy, echo back everything..
+    {#yabot_msg{ message=Message }, State};
+process_message(#yabot_msg{ channel=undefined, message=Message }, State) ->
+    process_message(Message, State);
+process_message(#yabot_msg{ message=Message }, #state{ nick=Me }=State) ->
+    case string:str(Message, Me) of
+        1 ->
+            process_message(
+              string:substr(Message, 1 + string:len(Me)),
+              State
+             );
+        _ ->
+            {[], State}
+    end;
+process_message(_, State) ->
+    {[], State}.

@@ -144,7 +144,7 @@ init(Options) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({handle_message, Message}, _From, State) ->
-    yabot:bridge_message(Message, State#state.bridges),
+    Replies = yabot:bridge_message(Message, State#state.bridges),
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
                  _ ->
@@ -154,7 +154,7 @@ handle_call({handle_message, Message}, _From, State) ->
                        State#state.room,
                        State)
              end,
-    {reply, ok, State1};
+    {reply, Replies, State1};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room, nick=Nick }=State) ->
     {reply, ok, State};
 handle_call({join_room, Room, Nick}, _From, #state{ room=Room }=State) ->
@@ -321,19 +321,33 @@ process_packet(_Type, _Attr, _From, _Packet, State) ->
 process_message(_Attr, undefined, _From, Packet, State) ->
     io:format("~s~n", [exmpp_xml:document_to_list(Packet)]),
     State;
-process_message(groupchat, Message, From, _Packet, #state{ nick=Me }=State) ->
+process_message(groupchat, Message, From, Packet, #state{ nick=Me }=State) ->
     case exmpp_jid:resource(From) of
-        Me -> nop;
+        Me -> 
+            State;
         Sender ->
-            yabot:bridge_message(
-              #yabot_msg{
-                 channel=exmpp_jid:bare_to_binary(From),
-                 from=Sender,
-                 message=Message
-                }, 
-              State#state.bridges)
-    end,
+            Channel = exmpp_jid:bare_to_binary(From),
+            Replies = yabot:bridge_message(
+                        #yabot_msg{
+                           channel=Channel,
+                           from=Sender,
+                           message=Message
+                          }, 
+                        State#state.bridges),
+            send_replies(Replies, Channel, Packet, State)
+    end;
+process_message(chat, Message, From, Packet, #state{ bridges=Bridges }=State) ->
+    Replies = yabot:bridge_message(#yabot_msg{ from=From, message=Message }, Bridges),
+    send_replies(Replies, From, Packet, State).
+
+send_replies([], _To, _Packet, State) ->
     State;
-process_message(chat, Message, From, _Packet, #state{ bridges=Bridges }=State) ->
-    yabot:bridge_message(#yabot_msg{ from=From, message=Message }, Bridges),
+send_replies(Replies, To, Packet, State) ->
+    Reply = exmpp_stanza:reply(Packet),
+    [send(
+      exmpp_message:set_body(
+       Reply,
+       yabot:message_to_list(Msg)),
+      To, State)
+     || Msg <- Replies],
     State.

@@ -1,7 +1,11 @@
 #!/usr/bin/sh
 
-if [ -f yabot.config ]; then
-    CONFIG="-config yabot.config"
+if [ "$#" -gt 0 ]; then
+    CFG_FILE=$1
 fi
 
-erl -pa ebin deps/*/ebin ${CONFIG} -s yabot
+if [ -f ${CFG_FILE:="yabot.config"} ]; then
+    CONFIG="-config $CFG_FILE"
+fi
+
+erl -pa ebin deps/*/ebin $CONFIG -s yabot
