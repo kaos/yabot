@@ -1,7 +1,7 @@
 yabot
 =====
 
-Yet Another Bot.
+Yet Another Bot, or "why-a-bot(?)" ;c).
 
 Goals: slim and generic core feature set.
 
@@ -71,8 +71,7 @@ Bot options:
 - `{cmds, [cmd()]}`
 - `{filters, [filter()]}`
 
-Bot Commands
-............
+### Bot Commands
 
 The `cmd()` type has the following spec:
 
@@ -88,8 +87,7 @@ routed back as reply to the command.
 Args is a constraint on the number of args that is acceptable. This way it is possible to call sensitive commands
 that may have a query mode when called without args, for instance.
 
-Bot Filters
-...........
+### Bot Filters
 
 The `filter()` type has the following spec:
 
