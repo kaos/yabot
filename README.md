@@ -73,6 +73,8 @@ Bot options:
 
 ### Bot Commands
 
+Commands are invoked using the erlang `os:cmd/1` function, passing the message as arguments.
+
 The `cmd()` type has the following spec:
 
 ```erlang
@@ -89,6 +91,13 @@ that may have a query mode when called without args, for instance.
 
 ### Bot Filters
 
+String filters are invoked using the erlang `os:cmd/1` function, piping the message to stdin.
+
+Function filters take the string message as single argument and returns the filtered message as result.
+Note, that it is not possible to define functions directly in the config file, so the only way to have function filters
+is when the config is generated programmatically.
+A couple of dumb example filters are in the `example.config` file.
+
 The `filter()` type has the following spec:
 
 ```erlang
@@ -96,12 +105,38 @@ The `filter()` type has the following spec:
 -callback filter_fun(Message :: string()) -> Result :: string().
 ```
 
-String filters are commands executed by the shell (using `os:cmd/1`) where the message to filter is passed on `stdin`
-and the result should be sent to `stdout`.
-Function filters take the string message as single argument and returns the filtered message as result.
-Note, that it is not possible to define functions directly in the config file, so the only way to have function filters
-is when the config is generated programmatically.
-A couple of dumb example filters are in the `example.config` file.
+### Available commands/filters
+
+In `priv/cmds` are some scripts you can use with the yabot bot.
+
+The `translate.escript` file translates messages (ab)using Google Translate.
+
+Example config snippet, as a command in the `cmds` section:
+```erlang
+{exec, tr, 
+  "./priv/cmds/translate.escript", {3, 1000},
+  "tr [from <lang-code>|auto] to <lang-code> Text ...",
+  "Translate text using Google Translate.\n"
+  "From language can be auto detected if left out."
+}
+```
+
+Example config snippet, as a filter in the `filters` section:
+```erlang
+  "./priv/cmds/translate.escript to sv"
+```
+
+As a funny example, the following config snippet adds a translator bot that translates everything you say to it into Swedish:
+
+```erlang
+{bot, yabot_bot, [
+  {nick, "chatter-bot"},
+  {filters, [
+    "./priv/cmds/translate.escript to sv",
+    "sed 's/.*/echo \\0/'"
+  ]}
+]}
+```
 
 
 Common options
