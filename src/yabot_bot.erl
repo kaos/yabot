@@ -46,6 +46,7 @@
 -record(state, {
           nick,
           cmds=[],
+          filters=[],
           bridges=[]
          }).
 
@@ -82,13 +83,15 @@ init(Options) ->
     {ok, #state{
             nick=proplists:get_value(nick, Options, "yabot"),
             cmds=parse_cmds(proplists:get_value(cmds, Options, [])),
+            filters=yabot:list_opt(filters, Options),
             bridges=yabot:list_opt(bridges, Options)
            }
     }.
 
 handle_call({handle_message, Message}, _From, State) ->
-    Replies = yabot:bridge_message(Message, State#state.bridges),
-    {Reply, State1} = process_message(Message, State),
+    Msg = filter_message(Message, State#state.filters),
+    Replies = yabot:bridge_message(Msg, State#state.bridges),
+    {Reply, State1} = process_message(Msg, State),
     {reply, [Reply|Replies], State1};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
@@ -113,6 +116,26 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+filter_message(Message, []) -> Message;
+filter_message(#yabot_msg{ message=M }=Msg, Filters) 
+  when is_binary(M) ->
+    filter_message(Msg#yabot_msg{ message=binary_to_list(M) }, Filters);
+filter_message(Message, Filters) ->
+    lists:foldl(
+      fun (Filter, #yabot_msg{ message=Msg }=M) ->
+              if is_function(Filter) ->
+                      M#yabot_msg{ message=Filter(Msg) };
+                 is_list(Filter) ->
+                      M#yabot_msg{ 
+                        message=
+                            os:cmd(
+                              [Filter, " <<EOF-FILTER\n",
+                               Msg, "\nEOF-FILTER\n"])}
+              end
+      end,
+      Message,
+      Filters).
 
 process_message(#yabot_msg{ channel=undefined, message=Message }, State) ->
     process_command(parse(Message, undefined), State);

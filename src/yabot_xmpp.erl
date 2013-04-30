@@ -144,7 +144,6 @@ init(Options) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({handle_message, Message}, _From, State) ->
-    %% no, don't do that: Replies = yabot:bridge_message(Message, State#state.bridges),
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
                  _ ->
@@ -277,11 +276,15 @@ send(Packet, #state{ session=Session }=State) ->
       Session, Packet),
     State.
 
-send(Packet, To, State) ->
+send(Packet, To, State) 
+  when is_list(To) orelse is_binary(To) ->
     send(
       exmpp_xml:set_attribute(
         Packet, <<"to">>, To),
-      State).
+      State);
+send(Packet, To, State)
+  when ?IS_JID(To) ->
+    send(Packet, exmpp_jid:to_binary(To), State).
 
 join(undefined, _, _, State) -> State;
 join(Room, Nick, Status, State) ->
