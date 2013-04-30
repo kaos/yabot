@@ -195,7 +195,7 @@ cmd_to_atom(Command) ->
 list_synopsis(#state{ cmds=[] }) -> [];
 list_synopsis(#state{ cmds=Cmds }) -> 
     "I also respond to these commands:\r\n"
-        ++ string:join([S || #cmd{ synopsis=S } <- Cmds], ", ").
+        ++ string:join([S || #cmd{ synopsis=S } <- Cmds], "\n").
 
 reply(Message, State) ->    
     {#yabot_msg{ message=Message }, State}.
@@ -264,7 +264,9 @@ run_cmd(#cmd{ exec=Exec, args=Spec }=Cmd, Args, State) ->
     reply(
       case args_ok(Spec, length(Args)) of
           ok ->
-              os:cmd(cmd_string(Exec, Args));
+              OsCmd = cmd_string(Exec, Args),
+              io:format("~s exec: ~s~n", [?MODULE, OsCmd]),
+              os:cmd(OsCmd);
           Oops ->
               io_lib:format("~s~nusage: ~s", [Oops, Cmd#cmd.synopsis])
       end,
@@ -285,7 +287,7 @@ pl(_) -> "s".
 
 cmd_string(Exec, Args) ->
     string:join(
-      [Exec|[os_escape(Arg) || Arg <- [Args]]],
+      [Exec|[os_escape(Arg) || Arg <- Args]],
       " "
      ).
 
