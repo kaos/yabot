@@ -28,7 +28,8 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         handle_message/2
+         handle_message/2,
+         handle_message/3
         ]).
 
 
@@ -68,7 +69,10 @@ add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
 handle_message(Ref, Message) ->
-    gen_server:call(Ref, {handle_message, Message}).
+    handle_message(Ref, Message, []).
+
+handle_message(Ref, Message, Opts) ->
+    gen_server:call(Ref, {handle_message, Message, Opts}).
 
 
 %%%===================================================================
@@ -125,10 +129,13 @@ init(Options) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({handle_message, Message}, _From, State) ->
+handle_call({handle_message, Message, Opts}, _From, State) ->
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
-                 _ -> send(yabot:message_to_list(Message), State)
+                 _ -> send(
+                        proplists:get_value(chan, Opts),
+                        yabot:message_to_list(Message),
+                        State)
              end,
     {reply, [], State1};
 handle_call({join_channel, _Channel}, _From, State) ->
@@ -208,8 +215,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-send(Message, State) ->
+send(undefined, Message, State) ->
     eircc_sup:send_message(State#state.irc, Message),
+    State;
+send(Chan, Message, State) ->
+    eircc_sup:send_message(State#state.irc, {Chan, Message}),
     State.
 
 normalize_msg("ACTION " ++ Action) ->
@@ -218,7 +228,5 @@ normalize_msg(Msg) ->
     Msg.
 
 send_replies([], _To, _State) -> nop;
-send_replies(Replies, undefined, State) ->
-    [send(yabot:message_to_list(Reply), State) || Reply <- Replies];
 send_replies(Replies, To, State) ->
-    [send({say, To, yabot:message_to_list(Reply)}, State) || Reply <- Replies].
+    [send(To, yabot:message_to_list(Reply), State) || Reply <- Replies].

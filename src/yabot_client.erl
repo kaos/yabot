@@ -25,6 +25,8 @@
 
 -callback add_bridge(ServerRef :: server_ref(), Peer :: term()) -> ok.
 -callback handle_message(ServerRef :: server_ref(), Message :: #yabot_msg{}) -> Reply :: term().
+-callback handle_message(ServerRef :: server_ref(), Message :: #yabot_msg{}, 
+                         Options :: [{atom(), term()}]) -> Reply :: term().
      
 
 %% API

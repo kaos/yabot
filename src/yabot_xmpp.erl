@@ -28,7 +28,8 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         handle_message/2
+         handle_message/2,
+         handle_message/3
         ]).
 
 %% xmpp specific api
@@ -72,7 +73,10 @@ add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
 handle_message(Ref, Message) ->
-    gen_server:call(Ref, {handle_message, Message}).
+    handle_message(Ref, Message, []).
+
+handle_message(Ref, Message, Opts) ->
+    gen_server:call(Ref, {handle_message, Message, Opts}).
 
 
 %%%===================================================================
@@ -143,7 +147,7 @@ init(Options) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({handle_message, Message}, _From, State) ->
+handle_call({handle_message, Message, _Opts}, _From, State) ->
     State1 = case Message#yabot_msg.channel of
                  undefined -> State;
                  _ ->

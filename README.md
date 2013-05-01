@@ -44,9 +44,11 @@ IRC
 For IRC, there is a `yabot_irc` client module, that supports the following options:
 - `{host, "irc.example.com"}`
 - `{port, N}`
-- `{chan, "#channel"}`
+- `{join, ["#channel", ...]}`
 - `{nick, "nickname"}`
 - `{pass, "password"}`
+
+The first channel listed in the `join` option is the default channel for sending messages to.
 
 
 XMPP/Jabber
@@ -58,6 +60,8 @@ For XMPP, there is a `yabot_xmpp` client module, that supports the following opt
 - `{method, <authentication method>}` `password`, `digest` (default), `"PLAIN"`, `"ANONYMOUS"`, `"DIGEST-MD5"`.
 - `{room, "chatroom@server.com"}`
 - `{nick, "nickname"}`
+
+Note: `yabot_xmpp` does not yet support any bridge options (from [[Common options]]).
 
 
 Bot
@@ -144,7 +148,7 @@ Common options
 
 Options that are client agnostic, and should be supported by all clients:
 
-- `{bridges, [client_id(), ...]}`
+- `{bridges, [Bridge :: client_id() | {client_id(), Opts :: [{Key, Value}]}, ...]}`
 
 The `bridges` option allows messages received in one channel to be forwarded to other channels.
 When a message is forwarded to a transport client (such as IRC or XMPP) the message is sent to that channel,
@@ -152,6 +156,12 @@ unless it is a private message. Bridges can be chained, so it is possible to hav
 of jumps. This gives the possibility to have filter clients in between two bridged networks.
 Bots can act on bridged messages, either on private messages, or public messages that has the bot's name as prefix
 (or any other rule the bot may implement). It is bot speicific, really.
+
+Example bridge config for sending messages to the irc channel `#my-channel`:
+
+```erlang
+    {bridges, [{irc, [{chan, "#my-channel"}]}]}
+```    
 
 
 Run
