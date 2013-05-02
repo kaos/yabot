@@ -28,7 +28,8 @@
 %% yabot_client callbacks
 -export([
          add_bridge/2,
-         handle_message/2
+         handle_message/2,
+         handle_message/3
         ]).
 
 -include("yabot.hrl").
@@ -67,7 +68,14 @@ add_bridge(Ref, Peer) ->
     gen_server:call(Ref, {add_bridge, Peer}).
 
 handle_message(Ref, Message) ->
-    gen_server:call(Ref, {handle_message, Message}).
+    handle_message(Ref, Message, []).
+
+handle_message(Ref, Message, Opts) ->
+    Invoke = case proplists:get_value(async, Opts) of
+                 true -> cast;
+                 _ -> call
+             end,
+    gen_server:Invoke(Ref, {handle_message, Message, Opts}).
 
 
 %%%===================================================================
@@ -88,17 +96,18 @@ init(Options) ->
            }
     }.
 
-handle_call({handle_message, Message}, _From, State) ->
-    Msg = filter_message(Message, State#state.filters),
-    Replies = yabot:bridge_message(Msg, State#state.bridges),
-    {Reply, State1} = process_message(Msg, State),
-    {reply, [Reply|Replies], State1};
+handle_call({handle_message, Message, Opts}, _From, State) ->
+    {Reply, State1} = got_message(Message, Opts, State),
+    {reply, Reply, State1};
 handle_call({add_bridge, Peer}, _From, #state{ bridges=Peers }=State) ->
     {reply, ok, State#state{ bridges=[Peer|Peers]}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
+handle_cast({handle_message, Message, Opts}, State) ->
+    {_, State1} = got_message(Message, Opts, State),
+    {noreply, State1};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -117,6 +126,37 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+match(Chan, Keys, Opts) ->
+    [lists:member(
+       true,
+       [Elem == Value
+        || Elem <- [Chan, all],
+           Value <- proplists:get_all_values(Key, Opts)])
+     || Key <- Keys].
+
+got_message(#yabot_msg{ channel=Chan }=Message, Opts, State) ->
+    [Allow, Deny] = match(Chan, [allow, deny], Opts),
+    OK = case proplists:get_value(order, Opts, deny_allow) of
+             deny_allow ->
+                 if Allow -> true;
+                    Deny -> false;
+                    true -> true
+                 end;
+             allow_deny ->
+                 if Deny -> false;
+                    Allow -> true;
+                    true -> false
+                 end
+         end,
+    if OK ->
+            Msg = filter_message(Message, State#state.filters),
+            Replies = yabot:bridge_message(Msg, State#state.bridges),
+            {R, S} = process_message(Msg, State),
+            {[R|Replies], S};
+       true ->
+            {[], State}
+    end.
+
 filter_message(Message, []) -> Message;
 filter_message(#yabot_msg{ message=M }=Msg, Filters) 
   when is_binary(M) ->
@@ -127,6 +167,7 @@ filter_message(Message, Filters) ->
               if is_function(Filter) ->
                       M#yabot_msg{ message=Filter(Msg) };
                  is_list(Filter) ->
+                      io:format("~s filter: ~s << ~s~n", [?MODULE, Filter, Msg]),
                       M#yabot_msg{ 
                         message=
                             os:cmd(
@@ -265,7 +306,7 @@ run_cmd(#cmd{ exec=Exec, args=Spec }=Cmd, Args, State) ->
       case args_ok(Spec, length(Args)) of
           ok ->
               OsCmd = cmd_string(Exec, Args),
-              io:format("~s exec: ~s~n", [?MODULE, OsCmd]),
+              io:format("~s command: ~s~n", [?MODULE, OsCmd]),
               os:cmd(OsCmd);
           Oops ->
               io_lib:format("~s~nusage: ~s", [Oops, Cmd#cmd.synopsis])

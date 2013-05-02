@@ -50,6 +50,19 @@ For IRC, there is a `yabot_irc` client module, that supports the following optio
 
 The first channel listed in the `join` option is the default channel for sending messages to.
 
+### IRC bridge options
+
+When `yabot_irc` receives a bridged message, there are a few options you can tack on to it:
+
+- `{chan, Channel :: string()}` Send the message to channel. If this option is not given,
+  the message is sent to the first channel listed in the `join` client option.
+
+Example bridge config for sending messages to the irc channel `#my-channel`:
+
+```erlang
+    {bridges, [{irc, [{chan, "#my-channel"}]}]}
+```    
+
 
 XMPP/Jabber
 -----------
@@ -109,9 +122,23 @@ The `filter()` type has the following spec:
 -callback filter_fun(Message :: string()) -> Result :: string().
 ```
 
+### Bot bridge options
+
+When `yabot_bot` receives a bridged message, there are a few options you can tack on to it:
+
+- `async` Don't wait for the bot to process the message. Any replies to the message will be dropped.
+- `{allow, Channel :: string() | all}` Filter, forward and process messages received from channel.
+- `{deny, Channel :: string() | all}` Do not filter, forward or process messages received from channel.
+- `{order, Order :: deny_allow | allow_deny}` How to apply the `allow` and `deny` channel filters.
+  The `deny_allow` option will deny messages that match any of the `deny` options *unless* it also 
+  matches any of the `allow` options, and allow all messages matching neither `allow` nor `deny`.
+  The `allow_deny` option will only allow any messages matching any of the `allow` options, and that
+  doesn't match any of the `deny` options, and deny all messages matching neither `allow` nor `deny`.
+
+
 ### Available commands/filters
 
-In `priv/cmds` are some scripts you can use with the yabot bot.
+In `priv/cmds` are some scripts (ok, so far it's just the one) you can use with the yabot bot.
 
 The `translate.escript` file translates messages (ab)using Google Translate.
 
@@ -142,6 +169,10 @@ As a funny example, the following config snippet adds a translator bot that tran
 ]}
 ```
 
+Using the translate script as filter, and a few bridged bots and some channels/rooms you can setup a multilingual chat,
+where each participant can join the channel/room with the language of his/her choice, and the bots will take care of translating
+everything that is said between the channels/rooms. I tried it, it's awesome! :D
+
 
 Common options
 --------------
@@ -157,11 +188,8 @@ of jumps. This gives the possibility to have filter clients in between two bridg
 Bots can act on bridged messages, either on private messages, or public messages that has the bot's name as prefix
 (or any other rule the bot may implement). It is bot speicific, really.
 
-Example bridge config for sending messages to the irc channel `#my-channel`:
-
-```erlang
-    {bridges, [{irc, [{chan, "#my-channel"}]}]}
-```    
+The bridge `Opts` values are client specific, and interpreted on the receiving end of the bridge.
+See each client for available bridge options.
 
 
 Run

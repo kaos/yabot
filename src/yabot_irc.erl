@@ -215,6 +215,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+send(_, "", State) -> State;
 send(undefined, Message, State) ->
     eircc_sup:send_message(State#state.irc, Message),
     State;

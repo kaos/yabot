@@ -54,7 +54,9 @@ bridge_message(#yabot_msg{}=Msg, Dsts) ->
 message_to_list(#yabot_msg{ from=undefined, message=Message }) ->
     Message;
 message_to_list(#yabot_msg{ from=Nick, message=Message }) ->
-    format_message(Nick, Message).
+    format_message(Nick, Message);
+message_to_list(_) -> "".
+
 
 %%%===================================================================
 %%% Internal functions

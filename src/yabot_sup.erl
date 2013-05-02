@@ -48,11 +48,8 @@ start_client(Id, Mod, Options) ->
       ?MODULE, child_spec(Id, Mod, Options)
      ).
 
-client_req({Id, Extra}, Fun, Args) ->
-    ExtraArgs = if is_list(Extra) -> Extra;
-                   true -> [Extra]
-                end,
-    client_req(Id, Fun, Args ++ ExtraArgs);
+client_req({Id, Opts}, Fun, Args) ->
+    client_req(Id, Fun, Args ++ [Opts]);
 client_req(Id, Fun, Args) ->
     case client(Id) of
         {Id, Pid, _, [Mod|_]} ->

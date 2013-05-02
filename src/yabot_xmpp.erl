@@ -356,5 +356,5 @@ send_replies(Replies, To, Packet, State) ->
        Reply,
        yabot:message_to_list(Msg)),
       To, State)
-     || Msg <- Replies],
+     || #yabot_msg{}=Msg <- Replies],
     State.
