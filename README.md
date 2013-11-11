@@ -200,3 +200,7 @@ Run
 ```
 
 If no config file is specified, `yabot.config` is used if it exists in the current directory.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/kaos/yabot/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
